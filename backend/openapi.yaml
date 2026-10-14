@@ -1,0 +1,337 @@
+openapi: 3.0.0
+info:
+  title: ClipSync REST API
+  description: Interaktyvi vaizdo įrašų, komentarų ir medijos klipų platformos API sąsaja (1 laboratorinis darbas).
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+    description: Vietinis (Local) serveris
+
+tags:
+  - name: Videos
+    description: Vaizdo įrašų valdymas (5 metodai)
+  - name: Comments
+    description: Komentarų valdymas ir hierarchija (5 metodai)
+  - name: Clips
+    description: Komentarų medijos klipų valdymas ir hierarchija (5 metodai)
+
+paths:
+  /api/videos:
+    get:
+      tags: [Videos]
+      summary: 1. Gauti visų vaizdo įrašų sąrašą
+      responses:
+        '200':
+          description: Sėkmingai grąžintas sąrašas
+    post:
+      tags: [Videos]
+      summary: 2. Sukurti naują vaizdo įrašą
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoInput'
+      responses:
+        '201':
+          description: Vaizdo įrašas sukurtas
+        '422':
+          description: Trūksta privalomų laukų (title arba url)
+
+  /api/videos/{id}:
+    get:
+      tags: [Videos]
+      summary: 3. Gauti konkretų vaizdo įrašą pagal ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Vaizdo įrašas rastas
+        '400':
+          description: Neteisingas ID formatas
+        '404':
+          description: Vaizdo įrašas nerastas
+    put:
+      tags: [Videos]
+      summary: 4. Atnaujinti vaizdo įrašą
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VideoInput'
+      responses:
+        '200':
+          description: Vaizdo įrašas atnaujintas
+        '400':
+          description: Neteisingas ID formatas
+        '404':
+          description: Vaizdo įrašas nerastas
+        '422':
+          description: Trūksta privalomų laukų
+    delete:
+      tags: [Videos]
+      summary: 5. Ištrinti vaizdo įrašą
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Sėkmingai ištrinta (be turinio)
+        '400':
+          description: Neteisingas ID formatas
+        '404':
+          description: Vaizdo įrašas nerastas
+
+  /api/videos/{videoId}/comments:
+    get:
+      tags: [Comments]
+      summary: 6. Gauti visus konkretaus vaizdo įrašo komentarus
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Komentarų sąrašas grąžintas
+        '400':
+          description: Neteisingas videoId formatas
+        '404':
+          description: Vaizdo įrašas nerastas
+    post:
+      tags: [Comments]
+      summary: 7. Pridėti komentarą prie konkretaus vaizdo įrašo
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentInput'
+      responses:
+        '201':
+          description: Komentaras sukurtas
+        '400':
+          description: Neteisingas videoId formatas
+        '404':
+          description: Vaizdo įrašas nerastas
+        '422':
+          description: Trūksta privalomų laukų (author arba content)
+
+  /api/comments/{id}:
+    get:
+      tags: [Comments]
+      summary: 8. Gauti vieną komentarą pagal ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Komentaras rastas
+        '400':
+          description: Neteisingas ID formatas
+        '404':
+          description: Komentaras nerastas
+    put:
+      tags: [Comments]
+      summary: 9. Atnaujinti komentarą
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentInput'
+      responses:
+        '200':
+          description: Komentaras atnaujintas
+        '400':
+          description: Neteisingas ID formatas
+        '404':
+          description: Komentaras nerastas
+        '422':
+          description: Trūksta privalomų laukų
+    delete:
+      tags: [Comments]
+      summary: 10. Ištrinti komentarą
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Sėkmingai ištrinta
+        '400':
+          description: Neteisingas ID formatas
+        '404':
+          description: Komentaras nerastas
+
+  /api/comments/{commentId}/clips:
+    get:
+      tags: [Clips]
+      summary: 11. Gauti visus konkretaus komentaro klipus
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Klipų sąrašas grąžintas
+        '400':
+          description: Neteisingas commentId formatas
+        '404':
+          description: Komentaras nerastas
+    post:
+      tags: [Clips]
+      summary: 12. Pridėti klipą prie konkretaus komentaro
+      parameters:
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClipInput'
+      responses:
+        '201':
+          description: Klipas sukurtas
+        '400':
+          description: Neteisingas commentId formatas
+        '404':
+          description: Komentaras nerastas
+        '422':
+          description: Neteisingi arba trūkstami laukai (media_type turi būti image arba video_clip)
+
+  /api/clips/{id}:
+    get:
+      tags: [Clips]
+      summary: 13. Gauti vieną klipą pagal ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Klipas rastas
+        '400':
+          description: Neteisingas ID formatas
+        '404':
+          description: Klipas nerastas
+    put:
+      tags: [Clips]
+      summary: 14. Atnaujinti klipą
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClipInput'
+      responses:
+        '200':
+          description: Klipas atnaujintas
+        '400':
+          description: Neteisingas ID formatas
+        '404':
+          description: Klipas nerastas
+        '422':
+          description: Neteisingi arba trūkstami laukai
+    delete:
+      tags: [Clips]
+      summary: 15. Ištrinti klipą
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Sėkmingai ištrinta
+        '400':
+          description: Neteisingas ID formatas
+        '404':
+          description: Klipas nerastas
+
+components:
+  schemas:
+    VideoInput:
+      type: object
+      required: [title, url]
+      properties:
+        title:
+          type: string
+          example: "Naujas mokomasis video"
+        description:
+          type: string
+          example: "Trumpas video aprašymas"
+        url:
+          type: string
+          example: "https://youtube.com/watch?v=99999"
+    CommentInput:
+      type: object
+      required: [author, content]
+      properties:
+        author:
+          type: string
+          example: "Augustas"
+        content:
+          type: string
+          example: "Labai geras video, pridedu klipą!"
+    ClipInput:
+      type: object
+      required: [media_type, media_url]
+      properties:
+        media_type:
+          type: string
+          enum: [image, video_clip]
+          example: "video_clip"
+        media_url:
+          type: string
+          example: "https://imgur.com/my-clip.mp4"
+        timestamp_sec:
+          type: integer
+          example: 65

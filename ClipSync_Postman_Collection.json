@@ -1,0 +1,180 @@
+{
+  "info": {
+    "name": "ClipSync API - 1 Lab (15 metodu ir klaidu testai)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "createdVideoId", "value": "" },
+    { "key": "createdCommentId", "value": "" },
+    { "key": "createdClipId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. GET All Videos (200)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status kodas yra 200 OK', () => pm.response.to.have.status(200));",
+        "pm.test('Grąžintas JSON masyvas', () => pm.expect(pm.response.json()).to.be.an('array'));"
+      ]}}],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/videos" }
+    },
+    {
+      "name": "2. POST Create Video (201)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Resursas sukurtas - 201 Created', () => pm.response.to.have.status(201));",
+        "const res = pm.response.json();",
+        "pm.collectionVariables.set('createdVideoId', res.id);"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"title\": \"Testinis Video\", \"description\": \"Postman testas\", \"url\": \"https://youtube.com/watch?v=test\"}" },
+        "url": "{{baseUrl}}/api/videos"
+      }
+    },
+    {
+      "name": "3. GET Single Video (200)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status kodas yra 200 OK', () => pm.response.to.have.status(200));"
+      ]}}],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/videos/{{createdVideoId}}" }
+    },
+    {
+      "name": "4. PUT Update Video (200)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status kodas yra 200 OK', () => pm.response.to.have.status(200));"
+      ]}}],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"title\": \"Atnaujintas Video\", \"description\": \"Atnaujinta\", \"url\": \"https://youtube.com/watch?v=updated\"}" },
+        "url": "{{baseUrl}}/api/videos/{{createdVideoId}}"
+      }
+    },
+    {
+      "name": "5. POST Create Comment for Video (201)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Komentaras sukurtas - 201 Created', () => pm.response.to.have.status(201));",
+        "pm.collectionVariables.set('createdCommentId', pm.response.json().id);"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"author\": \"Augustas\", \"content\": \"Testinis komentaras\"}" },
+        "url": "{{baseUrl}}/api/videos/{{createdVideoId}}/comments"
+      }
+    },
+    {
+      "name": "6. GET Video Comments (200)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status kodas yra 200 OK', () => pm.response.to.have.status(200));"
+      ]}}],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/videos/{{createdVideoId}}/comments" }
+    },
+    {
+      "name": "7. GET Single Comment (200)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status kodas yra 200 OK', () => pm.response.to.have.status(200));"
+      ]}}],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/comments/{{createdCommentId}}" }
+    },
+    {
+      "name": "8. PUT Update Comment (200)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status kodas yra 200 OK', () => pm.response.to.have.status(200));"
+      ]}}],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"author\": \"Augustas\", \"content\": \"Atnaujintas komentaras\"}" },
+        "url": "{{baseUrl}}/api/comments/{{createdCommentId}}"
+      }
+    },
+    {
+      "name": "9. POST Create Clip for Comment (201)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Klipas sukurtas - 201 Created', () => pm.response.to.have.status(201));",
+        "pm.collectionVariables.set('createdClipId', pm.response.json().id);"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"media_type\": \"video_clip\", \"media_url\": \"https://imgur.com/clip.mp4\", \"timestamp_sec\": 30}" },
+        "url": "{{baseUrl}}/api/comments/{{createdCommentId}}/clips"
+      }
+    },
+    {
+      "name": "10. GET Comment Clips (200)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status kodas yra 200 OK', () => pm.response.to.have.status(200));"
+      ]}}],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/comments/{{createdCommentId}}/clips" }
+    },
+    {
+      "name": "11. GET Single Clip (200)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status kodas yra 200 OK', () => pm.response.to.have.status(200));"
+      ]}}],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/clips/{{createdClipId}}" }
+    },
+    {
+      "name": "12. PUT Update Clip (200)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Status kodas yra 200 OK', () => pm.response.to.have.status(200));"
+      ]}}],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"media_type\": \"image\", \"media_url\": \"https://imgur.com/updated.png\", \"timestamp_sec\": 45}" },
+        "url": "{{baseUrl}}/api/clips/{{createdClipId}}"
+      }
+    },
+    {
+      "name": "13. DELETE Clip (204)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Resursas ištrintas - 204 No Content', () => pm.response.to.have.status(204));"
+      ]}}],
+      "request": { "method": "DELETE", "url": "{{baseUrl}}/api/clips/{{createdClipId}}" }
+    },
+    {
+      "name": "14. DELETE Comment (204)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Resursas ištrintas - 204 No Content', () => pm.response.to.have.status(204));"
+      ]}}],
+      "request": { "method": "DELETE", "url": "{{baseUrl}}/api/comments/{{createdCommentId}}" }
+    },
+    {
+      "name": "15. DELETE Video (204)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Resursas ištrintas - 204 No Content', () => pm.response.to.have.status(204));"
+      ]}}],
+      "request": { "method": "DELETE", "url": "{{baseUrl}}/api/videos/{{createdVideoId}}" }
+    },
+    {
+      "name": "KLAIDA: Resursas nerastas (404 Not Found)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Grąžina 404 Not Found', () => pm.response.to.have.status(404));"
+      ]}}],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/videos/999999" }
+    },
+    {
+      "name": "KLAIDA: Blogas payload / trūksta laukų (422 Unprocessable Entity)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Grąžina 422 Unprocessable Entity', () => pm.response.to.have.status(422));"
+      ]}}],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\"description\": \"Tik aprašymas be title ir url\"}" },
+        "url": "{{baseUrl}}/api/videos"
+      }
+    },
+    {
+      "name": "KLAIDA: Blogas ID formatas (400 Bad Request)",
+      "event": [{ "listen": "test", "script": { "exec": [
+        "pm.test('Grąžina 400 Bad Request', () => pm.response.to.have.status(400));"
+      ]}}],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/videos/blogas_id" }
+    }
+  ]
+}
