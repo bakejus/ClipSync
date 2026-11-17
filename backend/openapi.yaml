@@ -1,37 +1,197 @@
 openapi: 3.0.0
 info:
   title: ClipSync REST API
-  description: Interaktyvi vaizdo įrašų, komentarų ir medijos klipų platformos API sąsaja (1 laboratorinis darbas).
-  version: 1.0.0
+  description: Vaizdo įrašų, komentarų ir medijos klipų platformos API su JWT autentifikacija
+  version: 2.0.0
 servers:
   - url: http://localhost:3000
-    description: Vietinis (Local) serveris
+    description: Local serveris
 
 tags:
+  - name: Auth
+    description: Autentifikacija ir žetonų valdymas (Register, Login, Refresh, Logout)
+  - name: Users
+    description: Naudotojų valdymas (Tik Admin rolei)
   - name: Videos
-    description: Vaizdo įrašų valdymas (5 metodai)
+    description: Vaizdo įrašų valdymas
   - name: Comments
-    description: Komentarų valdymas ir hierarchija (5 metodai)
+    description: Komentarų valdymas ir hierarchija
   - name: Clips
-    description: Komentarų medijos klipų valdymas ir hierarchija (5 metodai)
+    description: Komentarų medijos klipų valdymas ir hierarchija
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Įveskite prisijungimo metu gautą accessToken
+
+  schemas:
+    RegisterInput:
+      type: object
+      required: [username, email, password]
+      properties:
+        username:
+          type: string
+          example: "Naujas"
+        email:
+          type: string
+          example: "narys@ktu.lt"
+        password:
+          type: string
+          example: "slaptazodis123"
+        role:
+          type: string
+          enum: [member, admin]
+          example: "member"
+    LoginInput:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: "Tomas_KTU"
+        password:
+          type: string
+          example: "slaptazodis123"
+    RefreshInput:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+    VideoInput:
+      type: object
+      required: [title, url]
+      properties:
+        title:
+          type: string
+          example: "Naujas mokomasis video"
+        description:
+          type: string
+          example: "Trumpas video aprašymas"
+        url:
+          type: string
+          example: "https://youtube.com/watch?v=99999"
+    CommentInput:
+      type: object
+      required: [content]
+      properties:
+        author:
+          type: string
+          example: "Tomas_KTU"
+        content:
+          type: string
+          example: "Labai geras video, pridedu klipą!"
+    ClipInput:
+      type: object
+      required: [media_type, media_url]
+      properties:
+        media_type:
+          type: string
+          enum: [image, video_clip]
+          example: "video_clip"
+        media_url:
+          type: string
+          example: "https://imgur.com/my-clip.mp4"
+        timestamp_sec:
+          type: integer
+          example: 65
 
 paths:
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Registruoti naują naudotoją
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        '201':
+          description: Naudotojas užregistruotas
+        '409':
+          description: Naudotojas jau egzistuoja
+        '422':
+          description: Trūksta privalomų laukų
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Prisijungti ir gauti Access bei Refresh žetonus (JWT)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200':
+          description: Sėkmingai prisijungta (grąžina accessToken ir refreshToken)
+        '401':
+          description: Neteisingi prisijungimo duomenys
+
+  /api/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Atnaujinti Access žetoną naudojant Refresh žetoną
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshInput'
+      responses:
+        '200':
+          description: Sugeneruotas naujas accessToken
+        '401':
+          description: Trūksta refreshToken
+        '403':
+          description: Refresh žetonas nebegalioja
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Atsijungti ir panaikinti naudotojo Refresh žetoną
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sėkmingai atsijungta
+        '401':
+          description: Neprisijungęs naudotojas
+
+  /api/users:
+    get:
+      tags: [Users]
+      summary: "Gauti visų registruotų naudotojų sąrašą"
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Naudotojų sąrašas
+        '401':
+          description: Neprisijungęs naudotojas
+        '403':
+          description: Nepakanka teisių (reikalinga admin rolė)
+
   /api/videos:
     get:
       tags: [Videos]
-      summary: 1. Gauti visų vaizdo įrašų sąrašą (yra ir puslapiavimas)
+      summary: 1. Gauti visų vaizdo įrašų sąrašą
       parameters:
         - name: page
           in: query
           required: false
-          description: Puslapio numeris (pagal nutylėjimą 1)
           schema:
             type: integer
             default: 1
         - name: limit
           in: query
           required: false
-          description: Įrašų skaičius puslapyje (pagal nutylėjimą 10)
           schema:
             type: integer
             default: 10
@@ -40,7 +200,9 @@ paths:
           description: Sėkmingai grąžintas sąrašas
     post:
       tags: [Videos]
-      summary: 2. Sukurti naują vaizdo įrašą
+      summary: 2. Sukurti naują vaizdo įrašą (Member / Admin)
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -50,8 +212,10 @@ paths:
       responses:
         '201':
           description: Vaizdo įrašas sukurtas
+        '401':
+          description: Neprisijungęs naudotojas
         '422':
-          description: Trūksta privalomų laukų (title arba url)
+          description: Trūksta privalomų laukų
 
   /api/videos/{id}:
     get:
@@ -72,7 +236,9 @@ paths:
           description: Vaizdo įrašas nerastas
     put:
       tags: [Videos]
-      summary: 4. Atnaujinti vaizdo įrašą
+      summary: 4. Atnaujinti vaizdo įrašą (Tik savininkas pagal ID arba Admin)
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -88,15 +254,17 @@ paths:
       responses:
         '200':
           description: Vaizdo įrašas atnaujintas
-        '400':
-          description: Neteisingas ID formatas
+        '401':
+          description: Neprisijungęs naudotojas
+        '403':
+          description: Draudžiama keisti svetimą įrašą
         '404':
           description: Vaizdo įrašas nerastas
-        '422':
-          description: Trūksta privalomų laukų
     delete:
       tags: [Videos]
-      summary: 5. Ištrinti vaizdo įrašą
+      summary: 5. Ištrinti vaizdo įrašą (Tik savininkas pagal ID arba Admin)
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -105,9 +273,11 @@ paths:
             type: integer
       responses:
         '204':
-          description: Sėkmingai ištrinta (be turinio)
-        '400':
-          description: Neteisingas ID formatas
+          description: Sėkmingai ištrinta
+        '401':
+          description: Neprisijungęs naudotojas
+        '403':
+          description: Draudžiama trinti svetimą įrašą
         '404':
           description: Vaizdo įrašas nerastas
 
@@ -124,13 +294,13 @@ paths:
       responses:
         '200':
           description: Komentarų sąrašas grąžintas
-        '400':
-          description: Neteisingas videoId formatas
         '404':
           description: Vaizdo įrašas nerastas
     post:
       tags: [Comments]
-      summary: 7. Pridėti komentarą prie konkretaus vaizdo įrašo
+      summary: 7. Pridėti komentarą prie konkretaus vaizdo įrašo (Member / Admin)
+      security:
+        - bearerAuth: []
       parameters:
         - name: videoId
           in: path
@@ -146,12 +316,12 @@ paths:
       responses:
         '201':
           description: Komentaras sukurtas
-        '400':
-          description: Neteisingas videoId formatas
+        '401':
+          description: Neprisijungęs naudotojas
         '404':
           description: Vaizdo įrašas nerastas
         '422':
-          description: Trūksta privalomų laukų (author arba content)
+          description: Trūksta privalomų laukų
 
   /api/comments/{id}:
     get:
@@ -166,13 +336,13 @@ paths:
       responses:
         '200':
           description: Komentaras rastas
-        '400':
-          description: Neteisingas ID formatas
         '404':
           description: Komentaras nerastas
     put:
       tags: [Comments]
-      summary: 9. Atnaujinti komentarą
+      summary: 9. Atnaujinti komentarą (Tik savininkas pagal ID arba Admin)
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -188,15 +358,17 @@ paths:
       responses:
         '200':
           description: Komentaras atnaujintas
-        '400':
-          description: Neteisingas ID formatas
+        '401':
+          description: Neprisijungęs naudotojas
+        '403':
+          description: Draudžiama redaguoti kito naudotojo komentarą
         '404':
           description: Komentaras nerastas
-        '422':
-          description: Trūksta privalomų laukų
     delete:
       tags: [Comments]
-      summary: 10. Ištrinti komentarą
+      summary: 10. Ištrinti komentarą (Tik savininkas pagal ID arba Admin)
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -206,8 +378,10 @@ paths:
       responses:
         '204':
           description: Sėkmingai ištrinta
-        '400':
-          description: Neteisingas ID formatas
+        '401':
+          description: Neprisijungęs naudotojas
+        '403':
+          description: Draudžiama trinti kito naudotojo komentarą
         '404':
           description: Komentaras nerastas
 
@@ -224,20 +398,19 @@ paths:
         - name: media_type
           in: query
           required: false
-          description: Filtruoti klipus pagal tipą (image arba video_clip)
           schema:
             type: string
             enum: [image, video_clip]
       responses:
         '200':
           description: Klipų sąrašas grąžintas
-        '400':
-          description: Neteisingas commentId arba media_type formatas
         '404':
           description: Komentaras nerastas
     post:
       tags: [Clips]
-      summary: 12. Pridėti klipą prie konkretaus komentaro
+      summary: 12. Pridėti klipą prie konkretaus komentaro (Member / Admin)
+      security:
+        - bearerAuth: []
       parameters:
         - name: commentId
           in: path
@@ -253,12 +426,12 @@ paths:
       responses:
         '201':
           description: Klipas sukurtas
-        '400':
-          description: Neteisingas commentId formatas
+        '401':
+          description: Neprisijungęs naudotojas
         '404':
           description: Komentaras nerastas
         '422':
-          description: Neteisingi arba trūkstami laukai (media_type turi būti image arba video_clip)
+          description: Neteisingi arba trūkstami laukai
 
   /api/clips/{id}:
     get:
@@ -273,13 +446,13 @@ paths:
       responses:
         '200':
           description: Klipas rastas
-        '400':
-          description: Neteisingas ID formatas
         '404':
           description: Klipas nerastas
     put:
       tags: [Clips]
-      summary: 14. Atnaujinti klipą
+      summary: 14. Atnaujinti klipą (Tik savininkas pagal ID arba Admin)
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -295,15 +468,17 @@ paths:
       responses:
         '200':
           description: Klipas atnaujintas
-        '400':
-          description: Neteisingas ID formatas
+        '401':
+          description: Neprisijungęs naudotojas
+        '403':
+          description: Draudžiama redaguoti svetimą klipą
         '404':
           description: Klipas nerastas
-        '422':
-          description: Neteisingi arba trūkstami laukai
     delete:
       tags: [Clips]
-      summary: 15. Ištrinti klipą
+      summary: 15. Ištrinti klipą (Tik savininkas pagal ID arba Admin)
+      security:
+        - bearerAuth: []
       parameters:
         - name: id
           in: path
@@ -313,15 +488,17 @@ paths:
       responses:
         '204':
           description: Sėkmingai ištrinta
-        '400':
-          description: Neteisingas ID formatas
+        '401':
+          description: Neprisijungęs naudotojas
+        '403':
+          description: Draudžiama trinti svetimą klipą
         '404':
           description: Klipas nerastas
 
   /api/videos/{id}/dashboard:
     get:
       tags: [Videos]
-      summary: 16. Gauti video suvestinę (Dashboard), sukonstruotą iš kelių esybių
+      summary: 16. Video suvestinė (Dashboard), sukonstruotą iš kelių esybių
       parameters:
         - name: id
           in: path
@@ -335,43 +512,3 @@ paths:
           description: Neteisingas ID formatas
         '404':
           description: Vaizdo įrašas nerastas
-
-components:
-  schemas:
-    VideoInput:
-      type: object
-      required: [title, url]
-      properties:
-        title:
-          type: string
-          example: "Naujas mokomasis video"
-        description:
-          type: string
-          example: "Trumpas video aprašymas"
-        url:
-          type: string
-          example: "https://youtube.com/watch?v=99999"
-    CommentInput:
-      type: object
-      required: [author, content]
-      properties:
-        author:
-          type: string
-          example: "Augustas"
-        content:
-          type: string
-          example: "Labai geras video, pridedu klipą!"
-    ClipInput:
-      type: object
-      required: [media_type, media_url]
-      properties:
-        media_type:
-          type: string
-          enum: [image, video_clip]
-          example: "video_clip"
-        media_url:
-          type: string
-          example: "https://imgur.com/my-clip.mp4"
-        timestamp_sec:
-          type: integer
-          example: 65
