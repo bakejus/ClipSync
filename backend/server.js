@@ -21,14 +21,67 @@ const pool = new Pool({
 
 const isValidId = (id) => !isNaN(parseInt(id, 10)) && parseInt(id, 10) > 0;
 
+// Hypermedia pagalbines funkcijos
+const getBaseUrl = (req) => `${req.protocol}://${req.get('host')}`;
+
+const formatVideo = (video, req) => {
+    const base = getBaseUrl(req);
+    return {
+        ...video,
+        _links: {
+            self: { href: `${base}/api/videos/${video.id}`, method: 'GET' },
+            dashboard: { href: `${base}/api/videos/${video.id}/dashboard`, method: 'GET' },
+            update: { href: `${base}/api/videos/${video.id}`, method: 'PUT' },
+            delete: { href: `${base}/api/videos/${video.id}`, method: 'DELETE' },
+            comments: { href: `${base}/api/videos/${video.id}/comments`, method: 'GET' },
+            collection: { href: `${base}/api/videos`, method: 'GET' }
+        }
+    };
+};
+
+const formatComment = (comment, req) => {
+    const base = getBaseUrl(req);
+    return {
+        ...comment,
+        _links: {
+            self: { href: `${base}/api/comments/${comment.id}`, method: 'GET' },
+            video: { href: `${base}/api/videos/${comment.video_id}`, method: 'GET' },
+            clips: { href: `${base}/api/comments/${comment.id}/clips`, method: 'GET' }
+        }
+    };
+};
+
+const formatClip = (clip, req) => {
+    const base = getBaseUrl(req);
+    return {
+        ...clip,
+        _links: {
+            self: { href: `${base}/api/clips/${clip.id}`, method: 'GET' },
+            comment: { href: `${base}/api/comments/${clip.comment_id}`, method: 'GET' }
+        }
+    };
+};
+
 // ==========================================
-// Video su savo 4 CRUD metodais ir vienu papildomu
+// Video CRUD + Puslapiavimas + Dashboard
 // ==========================================
 
 app.get('/api/videos', async (req, res) => {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+
+    if (page < 1 || limit < 1) {
+        return res.status(400).json({ error: 'Puslapis (page) ir limitas (limit) turi buti teigiami skaiciai' });
+    }
+
+    const offset = (page - 1) * limit;
+
     try {
-        const result = await pool.query('SELECT * FROM videos ORDER BY id ASC');
-        res.status(200).json(result.rows);
+        const result = await pool.query(
+            'SELECT * FROM videos ORDER BY id ASC LIMIT $1 OFFSET $2',
+            [limit, offset]
+        );
+        res.status(200).json(result.rows.map(v => formatVideo(v, req)));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -39,7 +92,7 @@ app.get('/api/videos/:id', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM videos WHERE id = $1', [req.params.id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Vaizdo irasas nerastas' });
-        res.status(200).json(result.rows[0]);
+        res.status(200).json(formatVideo(result.rows[0], req));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -55,7 +108,7 @@ app.post('/api/videos', async (req, res) => {
             'INSERT INTO videos (title, description, url) VALUES ($1, $2, $3) RETURNING *',
             [title, description || '', url]
         );
-        res.status(201).json(result.rows[0]);
+        res.status(201).json(formatVideo(result.rows[0], req));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -73,7 +126,7 @@ app.put('/api/videos/:id', async (req, res) => {
             [title, description || '', url, req.params.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Vaizdo irasas nerastas' });
-        res.status(200).json(result.rows[0]);
+        res.status(200).json(formatVideo(result.rows[0], req));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -90,8 +143,60 @@ app.delete('/api/videos/:id', async (req, res) => {
     }
 });
 
+app.get('/api/videos/:id/dashboard', async (req, res) => {
+    if (!isValidId(req.params.id)) return res.status(400).json({ error: 'Neteisingas ID formatas' });
+
+    try {
+        const videoResult = await pool.query('SELECT * FROM videos WHERE id = $1', [req.params.id]);
+        if (videoResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Vaizdo įrašas nerastas (404 Not Found)' });
+        }
+        const video = videoResult.rows[0];
+
+        const commentsResult = await pool.query('SELECT * FROM comments WHERE video_id = $1 ORDER BY id ASC', [video.id]);
+        const comments = commentsResult.rows;
+
+        let allClips = [];
+        if (comments.length > 0) {
+            const commentIds = comments.map(c => c.id);
+            const clipsResult = await pool.query(
+                'SELECT * FROM clips WHERE comment_id = ANY($1::int[]) ORDER BY id ASC',
+                [commentIds]
+            );
+            allClips = clipsResult.rows;
+        }
+
+        const dashboardObject = {
+            video: {
+                id: video.id,
+                title: video.title,
+                description: video.description,
+                url: video.url,
+                created_at: video.created_at
+            },
+            comments_summary: {
+                total_count: comments.length,
+                items: comments
+            },
+            clips_summary: {
+                total_count: allClips.length,
+                items: allClips
+            },
+            _links: {
+                self: { href: `${getBaseUrl(req)}/api/videos/${video.id}/dashboard`, method: 'GET' },
+                video_details: { href: `${getBaseUrl(req)}/api/videos/${video.id}`, method: 'GET' },
+                collection: { href: `${getBaseUrl(req)}/api/videos`, method: 'GET' }
+            }
+        };
+
+        res.status(200).json(dashboardObject);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ==========================================
-// Komentarai CRUD ir + 1 papildomas metodas
+// Komentarai CRUD
 // ==========================================
 
 app.get('/api/videos/:videoId/comments', async (req, res) => {
@@ -101,7 +206,7 @@ app.get('/api/videos/:videoId/comments', async (req, res) => {
         if (videoCheck.rows.length === 0) return res.status(404).json({ error: 'Vaizdo irasas nerastas' });
 
         const result = await pool.query('SELECT * FROM comments WHERE video_id = $1 ORDER BY id ASC', [req.params.videoId]);
-        res.status(200).json(result.rows);
+        res.status(200).json(result.rows.map(c => formatComment(c, req)));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -112,7 +217,7 @@ app.get('/api/comments/:id', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM comments WHERE id = $1', [req.params.id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Komentaras nerastas' });
-        res.status(200).json(result.rows[0]);
+        res.status(200).json(formatComment(result.rows[0], req));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -132,7 +237,7 @@ app.post('/api/videos/:videoId/comments', async (req, res) => {
             'INSERT INTO comments (video_id, author, content) VALUES ($1, $2, $3) RETURNING *',
             [req.params.videoId, author, content]
         );
-        res.status(201).json(result.rows[0]);
+        res.status(201).json(formatComment(result.rows[0], req));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -150,7 +255,7 @@ app.put('/api/comments/:id', async (req, res) => {
             [author, content, req.params.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Komentaras nerastas' });
-        res.status(200).json(result.rows[0]);
+        res.status(200).json(formatComment(result.rows[0], req));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -168,17 +273,34 @@ app.delete('/api/comments/:id', async (req, res) => {
 });
 
 // ==========================================
-// Klipai CRUD + 1 papildomas metodas
+// Klipai CRUD + Filtravimas
 // ==========================================
 
 app.get('/api/comments/:commentId/clips', async (req, res) => {
     if (!isValidId(req.params.commentId)) return res.status(400).json({ error: 'Neteisingas commentId formatas' });
+
+    const { media_type } = req.query;
+
+    if (media_type && !['image', 'video_clip'].includes(media_type)) {
+        return res.status(400).json({ error: 'Neteisingas media_type filtras. Galimos reiksmes: image, video_clip' });
+    }
+
     try {
         const commentCheck = await pool.query('SELECT id FROM comments WHERE id = $1', [req.params.commentId]);
         if (commentCheck.rows.length === 0) return res.status(404).json({ error: 'Komentaras nerastas' });
 
-        const result = await pool.query('SELECT * FROM clips WHERE comment_id = $1 ORDER BY id ASC', [req.params.commentId]);
-        res.status(200).json(result.rows);
+        let query = 'SELECT * FROM clips WHERE comment_id = $1';
+        const params = [req.params.commentId];
+
+        if (media_type) {
+            params.push(media_type);
+            query += ` AND media_type = $2`;
+        }
+
+        query += ' ORDER BY id ASC';
+
+        const result = await pool.query(query, params);
+        res.status(200).json(result.rows.map(cl => formatClip(cl, req)));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -189,7 +311,7 @@ app.get('/api/clips/:id', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM clips WHERE id = $1', [req.params.id]);
         if (result.rows.length === 0) return res.status(404).json({ error: 'Klipas nerastas' });
-        res.status(200).json(result.rows[0]);
+        res.status(200).json(formatClip(result.rows[0], req));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -209,7 +331,7 @@ app.post('/api/comments/:commentId/clips', async (req, res) => {
             'INSERT INTO clips (comment_id, media_type, media_url, timestamp_sec) VALUES ($1, $2, $3, $4) RETURNING *',
             [req.params.commentId, media_type, media_url, timestamp_sec || 0]
         );
-        res.status(201).json(result.rows[0]);
+        res.status(201).json(formatClip(result.rows[0], req));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -227,7 +349,7 @@ app.put('/api/clips/:id', async (req, res) => {
             [media_type, media_url, timestamp_sec || 0, req.params.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'Klipas nerastas' });
-        res.status(200).json(result.rows[0]);
+        res.status(200).json(formatClip(result.rows[0], req));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

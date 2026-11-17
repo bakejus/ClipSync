@@ -19,7 +19,22 @@ paths:
   /api/videos:
     get:
       tags: [Videos]
-      summary: 1. Gauti visų vaizdo įrašų sąrašą
+      summary: 1. Gauti visų vaizdo įrašų sąrašą (yra ir puslapiavimas)
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: Puslapio numeris (pagal nutylėjimą 1)
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          description: Įrašų skaičius puslapyje (pagal nutylėjimą 10)
+          schema:
+            type: integer
+            default: 10
       responses:
         '200':
           description: Sėkmingai grąžintas sąrašas
@@ -199,18 +214,25 @@ paths:
   /api/comments/{commentId}/clips:
     get:
       tags: [Clips]
-      summary: 11. Gauti visus konkretaus komentaro klipus
+      summary: 11. Gauti visus konkretaus komentaro klipus (su filtravimu)
       parameters:
         - name: commentId
           in: path
           required: true
           schema:
             type: integer
+        - name: media_type
+          in: query
+          required: false
+          description: Filtruoti klipus pagal tipą (image arba video_clip)
+          schema:
+            type: string
+            enum: [image, video_clip]
       responses:
         '200':
           description: Klipų sąrašas grąžintas
         '400':
-          description: Neteisingas commentId formatas
+          description: Neteisingas commentId arba media_type formatas
         '404':
           description: Komentaras nerastas
     post:
@@ -295,6 +317,24 @@ paths:
           description: Neteisingas ID formatas
         '404':
           description: Klipas nerastas
+
+  /api/videos/{id}/dashboard:
+    get:
+      tags: [Videos]
+      summary: 16. Gauti video suvestinę (Dashboard), sukonstruotą iš kelių esybių
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Sėkmingai sukonstruota suvestinė iš Video, Comments ir Clips
+        '400':
+          description: Neteisingas ID formatas
+        '404':
+          description: Vaizdo įrašas nerastas
 
 components:
   schemas:
